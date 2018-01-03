@@ -4,7 +4,8 @@ from PyQt4.QtCore import *
 from PyQt4.QtGui import *
 import requests
 from pprint import pprint
-import random
+import json
+
 
 def populateNeighbors(nodes):
     for n in nodes:
@@ -17,6 +18,7 @@ def populateNeighbors(nodes):
         for i in range(16):
             tot.append(l[sort[i]])
         n.neighbors=tot
+        n.setSignalLoss()
             
 def getData():
     r=requests.get('http://localhost:8080/fixtures')
@@ -62,8 +64,8 @@ class infoMessage(QDialog):
 
     def __init__(self,node,parent=None):
         super(infoMessage,self).__init__(parent)
-
-
+        
+        
         layout = QHBoxLayout()
         okB=QPushButton("&OK")
         layout.addWidget(okB)
@@ -71,16 +73,17 @@ class infoMessage(QDialog):
 
 
         L = QVBoxLayout()
-        label=QLabel(str(node))
-        L.addWidget(label)
+        self.label=QLabel(node.toString())
+        L.addWidget(self.label)
         L.addLayout(layout)
         self.setLayout(L)
 
         self.connect(okB,SIGNAL("clicked()"),self.okClicked)
-
+        
 
     def okClicked(self):
         self.accept()
+        
 
 
 
@@ -168,6 +171,11 @@ class Example(QWidget):
                         s.motion=0
                 if s.motion > 100:
                     s.motion = 100
+        x=[]
+        if self.time==0:
+            for n in self.info:
+                x.append({"euid":n.euid,"neighbors":n.neighborLoss,"motion":n.motion})
+            requests.post('http://localhost:8080/fixtures',json.dumps(x))
         self.timer.start(15,self)
 
     def paintEvent(self, e):
@@ -293,6 +301,7 @@ class Node():
         self.subscriptions=data[u'subscriptions']
         self.neighbors=[]
         self.motion=0
+        self.neighborLoss={}
 
     def update(self,other):
         self.x=other.x
@@ -310,11 +319,16 @@ class Node():
         self.sensor_fw_version=other.sensor_fw_version
         self.subscriptions=other.subscriptions
 
+
+    def setSignalLoss(self):
+        for i in self.neighbors:
+            loss= 20*log10( sqrt( (self.x/6-i.x/6)**2  + (self.y/6-i.y/6)**2  )  ) +20*log10(2.4*(10**9)) + 20*log10(4*pi/(3*(10**8)))
+            self.neighborLoss[i.euid]=loss
         
     def __cmp__(self,other):
         return cmp(self.euid,other.euid)
 
-    def __str__(self):
+    def toString(self):
         s=""
         s+="X: "+str(self.x)+" Y: "+str(self.y)+"\nActivated: "+str(self.activated)+"\nAddr: "+str(self.addr)+"\nConnected: "+str(self.connected)+"  \nDimming: "+str(self.dimming)
         s+="  \nEUID: "+str(self.euid)+"  \nfw_verion: "+str(self.fw_version)+"  \ngroups: "+str(self.groups)+"  \nonoff: "+str(self.onoff)+"  \npm_fw_version: "+str(self.pm_fw_version)
@@ -326,6 +340,9 @@ class Node():
             loss= 20*log10( sqrt( (self.x/6-i.x/6)**2  + (self.y/6-i.y/6)**2  )  ) +20*log10(2.4*(10**9)) + 20*log10(4*pi/(3*(10**8)))
             s+="\n"+str(i.euid)+"\tFSPL: "+str(loss)
         return s
+
+    def __str__(self):
+        return(str(self.euid))
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
