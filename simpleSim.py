@@ -9,6 +9,7 @@ class infoMessage(QDialog):
     def __init__(self,node,parent=None):
         super(infoMessage,self).__init__(parent)
 
+
         layout = QHBoxLayout()
         okB=QPushButton("&OK")
         layout.addWidget(okB)
@@ -36,23 +37,40 @@ class Example(QWidget):
     def __init__(self,stuff):
         super(Example, self).__init__()
         self.info=stuff
+        self.man=[False,0,0]
         self.initUI()
+        self.timer=QBasicTimer()
+        self.timer.start(100,self)
+
+
         
+
     def initUI(self):
         
         self.setGeometry(300, 300, 600, 600)
         self.setWindowTitle('Simple Test')
         self.show()
 
+
+    def timerEvent(self,event):
+        self.info[(30,15)].status="OFF"
+        self.repaint()
+        if self.man[0]:
+            self.man[2]+=5
+        else:
+            if self.man[2]>=600:
+                self.man=[False,0,0]
+        self.timer.start(50,self)
+
     def paintEvent(self, e):
-        qp = QPainter()
+        qp=QPainter()
         qp.begin(self)
-        self.drawPoints(qp)
-        qp.end()
+
+        br=QBrush(Qt.SolidPattern)
+        br.setColor(Qt.white)
+        r=QRect(0,0,1000,1000)
+        qp.fillRect(r,br)
         
-    def drawPoints(self, qp):
-      
-        size = self.size()
         for s in self.info:
             x=int(s[0])
             y=int(s[1])
@@ -64,6 +82,17 @@ class Example(QWidget):
                 brush.setColor(Qt.red)
             qp.setBrush(brush)
             qp.fillRect(q,brush)
+
+        if self.man[0]:
+            m=QRect(self.man[1],self.man[2],10,4)
+            brush=QBrush(Qt.SolidPattern)
+            brush.setColor(Qt.green)
+            qp.fillRect(m,brush)
+
+        qp.end()
+        
+
+    
     def mousePressEvent(self,event):
         for s in self.info:
             if s[0]<=event.x()<=s[0]+5 and s[1]<=event.y()<=s[1]+5:
@@ -73,7 +102,7 @@ class Example(QWidget):
     def keyPressEvent(self,event):
         key=event.key()
         if(key == Qt.Key_Return):
-            print "hey"
+            self.man=[True,300,0]
 
 
 
