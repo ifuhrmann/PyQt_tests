@@ -5,7 +5,7 @@ from PyQt4.QtGui import *
 import requests
 from pprint import pprint
 import json
-
+import random
 from sqlalchemy import Column, ForeignKey, Integer, String, Text, DateTime, func
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
@@ -31,7 +31,7 @@ def populateNeighbors(nodes):
         l={}
         for n1 in nodes:
             if n != n1 :
-                l[100*sqrt( (n1.x-n.x)**2 +  (n1.y-n.y)**2 )+(10**(-14))*n1.euid]=n1            
+                l[100*sqrt( (n1.x-n.x)**2 +  (n1.y-n.y)**2 )+(10**(-14))*n1.euid]=n1 #note: we add the euid so distances are unique
         sort=sorted(l)
         tot=[]
         for i in range(16):
@@ -59,8 +59,8 @@ def getData():
 
 
 
-def updateData(data):
-    r=requests.get('http://localhost:8080/fixtures')
+def updateData(data): #using this rather than getData tries to keep the nodes the same throughout the program
+    r=requests.get('http://localhost:8080/fixtures') #also, it avoids recalculating neighbors
     fixtures=r.json()
     l=[]
     for s in fixtures:
@@ -69,7 +69,7 @@ def updateData(data):
     for s in l:
         for n in data:
             if s==n:
-                n.update(s)
+                n.update(s) 
                 break
     
 
@@ -107,7 +107,7 @@ class testMenu(QDialog):
     def __init__(self,parent=None):
         super(testMenu,self).__init__(parent)
 
-
+        self.noTestClicked=False
         layout = QHBoxLayout()
         okB=QPushButton("&Run this")
         cancel=QPushButton("No Test")
@@ -123,9 +123,10 @@ class testMenu(QDialog):
         radio=QHBoxLayout()
         self.r1=QRadioButton("Man Walking: Straight Path")
         self.r2=QRadioButton("Man Walking: Circular Path")
-        self.r3=QRadioButton("Man Walking: User Controlled Path")
+        self.r3=QRadioButton("Man Walking: Random Path")
         radio.addWidget(self.r1)
         radio.addWidget(self.r2)
+        radio.addWidget(self.r3)
         L.addLayout(radio)
         L.addLayout(layout)
         self.setLayout(L)
@@ -136,6 +137,7 @@ class testMenu(QDialog):
     def okClicked(self):
         self.accept()
     def cancelClicked(self):
+        self.noTestClicked=True
         self.reject()
 
 
@@ -174,34 +176,40 @@ class Example(QWidget):
             self.man[3]+=.05
             self.man[1]=200*cos(self.man[3])+300
             self.man[2]=200*sin(self.man[3])+300
+        if self.man[0]==3:
+            theta=2*pi*random.random()
+            self.man[1]+=7*cos(theta)
+            self.man[2]+=7*sin(theta)
 
         self.time=(self.time+1)%3
-        if self.man[0]==1 or self.man[0]==2:
+        if self.man[0]==1 or self.man[0]==2 or self.man[0]==3:
             for s in self.info:
                 if  sqrt( (s.x-self.man[1])**2 + (s.y-self.man[2])**2 ) < 75:
                     s.motion+=10
-                if self.time==0:
-                    s.motion-=10
-                    if s.motion < 0:
-                        s.motion=0
                 if s.motion > 100:
                     s.motion = 100
+        for s in self.info:
+            if self.time==0:
+                s.motion-=10
+                if s.motion < 0:
+                    s.motion=0
+
         x=[]
         if self.time==0:
             for n in self.info:
                 x.append({"euid":n.euid,"neighbors":n.neighborLoss,"motion":n.motion})
             requests.post('http://localhost:8080/fixtures',json.dumps(x))
-        self.timer.start(15,self)
+        self.timer.start(5,self)
 
-    def paintEvent(self, e):
-        qp=QPainter()
+    def paintEvent(self, e): #this is called every self.repaint(), and basically every time the window is changed.
+        qp=QPainter()        #calling paintEvent as a method directly does not draw anything, repaint has to be used
         qp.begin(self)
 
         br=QBrush(Qt.SolidPattern)
         br.setColor(Qt.white)
         r=QRect(0,0,1000,1000)
         qp.fillRect(r,br)
-        if self.state==0:
+        if self.state==0: #self.state refers to whether or not to note neighbors, 0 means don't, 1 means do
             for s in self.info:
                 x=int(s.x)
                 y=int(s.y)
@@ -228,6 +236,7 @@ class Example(QWidget):
                 brush=QBrush(Qt.SolidPattern)
                 brush.setColor(Qt.green)
                 qp.fillRect(m,brush)
+                
         elif self.state==1:
             for s in self.info:
                 x=int(s.x)
@@ -275,7 +284,7 @@ class Example(QWidget):
         
 
     
-    def mousePressEvent(self,event):
+    def mousePressEvent(self,event): #event.button() returns 1 on left click, 2 on right, and 4 on middle mouse
         self.moveNode=None
         if event.button()==1 :
             for s in self.info:
@@ -296,8 +305,11 @@ class Example(QWidget):
                     self.man=[1,300,0]
                 if b.r2.isChecked():
                     self.man=[2,500,300,0]
+                if b.r3.isChecked():
+                    self.man=[3,300,300]
             else:
-                self.man=[False,0,0]
+                if b.noTestClicked:
+                    self.man=[False,0,0]
 
         if event.button()==4:
             for s in self.info:
@@ -305,9 +317,9 @@ class Example(QWidget):
                     self.moveNode=s
     
 
-    def mouseReleaseEvent(self,event):
+    def mouseReleaseEvent(self,event): #this gets called on all clicks, not just click & drags
         if self.moveNode is not None:
-            if  self.moveNode.x<=event.x()<=self.moveNode.x+5 and self.moveNode.y<=event.y()<=self.moveNode.y+5:
+            if  sqrt( (self.moveNode.x-event.x() )**2+ (self.moveNode.y-event.y())**2 ) <=10:
                 pass
             else:
                 self.moveNode.x=event.x()
