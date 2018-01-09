@@ -152,9 +152,9 @@ class Example(QWidget):
         self.timer=QBasicTimer()
         self.timer.start(100,self)
         self.state=0
-        self.node=None
-        self.time=0
-        self.moveNode=None
+        self.node=None     #the node whose neighbors are displayed
+        self.time=0        #used to slow the rate of posting
+        self.moveNode=None #the node being moved
 
     def initUI(self):
         
@@ -206,9 +206,6 @@ class Example(QWidget):
         qp.begin(self)
 
         br=QBrush(Qt.SolidPattern)
-        br.setColor(Qt.white)
-        r=QRect(0,0,1000,1000)
-        qp.fillRect(r,br)
         if self.state==0: #self.state refers to whether or not to note neighbors, 0 means don't, 1 means do
             for s in self.info:
                 x=int(s.x)
@@ -232,6 +229,8 @@ class Example(QWidget):
                 qp.fillRect(q,brush)
 
             if self.man[0]:
+                #doesn't complain when self.man[0] is a number?
+                #tried changing to  if self.man[0] is not False but that made the right click menu weird. Leave it be.
                 m=QRect(self.man[1],self.man[2],10,4)
                 brush=QBrush(Qt.SolidPattern)
                 brush.setColor(Qt.green)
@@ -274,7 +273,7 @@ class Example(QWidget):
                 qp.setBrush(brush)
                 qp.fillRect(q,brush)
 
-            if self.man[0]:
+            if self.man[0]: 
                 m=QRect(self.man[1],self.man[2],10,4)
                 brush=QBrush(Qt.SolidPattern)
                 brush.setColor(Qt.green)
@@ -288,7 +287,7 @@ class Example(QWidget):
         self.moveNode=None
         if event.button()==1 :
             for s in self.info:
-                if sqrt( (s.x-event.x() )**2+ (s.y-event.y())**2 ) <=10:
+                if sqrt( (s.x+2.5-event.x() )**2+ (s.y+2.5-event.y())**2 ) <=10:
                     self.state=1
                     self.node=s
                     self.repaint()
